@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Controle LED (ESP32) - Web</title>
+  <style>
+    body { font-family: Arial, sans-serif; display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#111; color:#fff;}
+    .card { background:#1a1a1a;padding:24px;border-radius:12px; box-shadow: 0 6px 18px rgba(0,0,0,0.6); text-align:center; width:320px; }
+    h1 { margin:0 0 12px;font-size:20px; }
+    .status { margin:12px 0; font-weight:600;}
+    button { padding:12px 20px;border-radius:8px;border:none;font-size:16px; cursor:pointer; }
+    .on { background:#4caf50; color:#fff; }
+    .off { background:#e53935; color:#fff; }
+    .loading { opacity:0.6; pointer-events:none; }
+    small { display:block; margin-top:10px; color:#aaa; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Controle LED - ESP32</h1>
+    <div class="status" id="status">Conectando...</div>
+    <button id="toggleBtn" class="loading">Carregando...</button>
+    <small id="pathHint"></small>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+    // === SUA CONFIGURAÇÃO DO FIREBASE ===
+    const firebaseConfig = {
+      apiKey: "AIzaSyAEgLyJ6i2ZaSNnBrLMoe2ajInd4MGKHIs",
+      authDomain: "controle-led-esp-oficial.firebaseapp.com",
+      databaseURL: "https://controle-led-esp-oficial-default-rtdb.firebaseio.com",
+      projectId: "controle-led-esp-oficial",
+      storageBucket: "controle-led-esp-oficial.firebasestorage.app",
+      messagingSenderId: "1082980860084",
+      appId: "1:1082980860084:web:b3b669b8f1801c3d6657e1"
+    };
+
+    // === Caminho exato que seu ESP32 usa ===
+    const DB_PATH = "/led";
+
+    // Inicializa Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Elementos da interface
+    const statusEl = document.getElementById('status');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const pathHint = document.getElementById('pathHint');
+    pathHint.textContent = "DB path: " + DB_PATH;
+
+    // Função para atualizar a interface
+    function updateUI(isOn) {
+      if (isOn) {
+        statusEl.textContent = "LED: LIGADO";
+        toggleBtn.textContent = "DESLIGAR";
+        toggleBtn.className = "on";
+      } else {
+        statusEl.textContent = "LED: DESLIGADO";
+        toggleBtn.textContent = "LIGAR";
+        toggleBtn.className = "off";
+      }
+      toggleBtn.classList.remove('loading');
+    }
+
+    // Monitoramento em tempo real
+    const ledRef = db.ref(DB_PATH);
+    ledRef.on('value', snapshot => {
+      const val = snapshot.val();
+      let isOn = false;
+      if (val === true || val === 1 || val === "1" || String(val).toLowerCase() === "on" || String(val) === "true") {
+        isOn = true;
+      }
+      updateUI(isOn);
+    }, error => {
+      statusEl.textContent = "Erro DB: " + error.message;
+      toggleBtn.classList.add('loading');
+      toggleBtn.textContent = "Erro";
+    });
+
+    // Botão para alternar estado
+    toggleBtn.addEventListener('click', async () => {
+      toggleBtn.classList.add('loading');
+
+      const snap = await ledRef.get();
+      const cur = snap.exists() ? snap.val() : 0;
+      let curOn = (cur === true || cur === 1 || cur === "1" || String(cur).toLowerCase() === "on" || String(cur) === "true");
+
+      const newVal = curOn ? 0 : 1;
+
+      ledRef.set(newVal)
+        .catch(err => {
+          statusEl.textContent = "Erro ao escrever: " + err.message;
+          toggleBtn.classList.remove('loading');
+        });
+    });
+  </script>
+</body>
+</html>
